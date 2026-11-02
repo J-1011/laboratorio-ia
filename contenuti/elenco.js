@@ -2,4 +2,6 @@
 // lessons are shown by their "numero".
 listLessons([
   "lezione-1",
+  "lezione-2",
+  "lezione-3",
 ]);
