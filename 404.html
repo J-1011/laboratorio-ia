@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pagina non trovata · Museo CTRL+Alt</title>
+    <style>
+      /* Self-contained on purpose: hosts serve this page for a wrong address at any
+         depth, where a relative link to static/style.css would not resolve. */
+      body {
+        margin: 0;
+        background: #f7f5f0;
+        color: #141b2d;
+        font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+        font-size: clamp(1.125rem, 0.8125rem + 0.7vw, 1.375rem);
+        line-height: 1.6;
+      }
+      header {
+        background: #141b2d;
+        color: #f7f5f0;
+      }
+      header div,
+      main {
+        max-width: 62rem;
+        margin: 0 auto;
+        padding: 2.5rem clamp(1rem, 4vw, 2.5rem);
+      }
+      p.place {
+        margin: 0 0 2.5rem;
+        color: #c9ced8;
+      }
+      h1 {
+        margin: 0;
+        font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
+        font-size: clamp(1.75rem, 1.2rem + 2.6vw, 3.2rem);
+        line-height: 1.2;
+      }
+      h1::after {
+        content: "";
+        display: block;
+        width: 4rem;
+        height: 0.25rem;
+        margin-top: 1.25rem;
+        background: #e8622c;
+      }
+      header p.intro {
+        margin: 1.25rem 0 0;
+        color: #c9ced8;
+      }
+      button {
+        background: #e8622c;
+        color: #141b2d;
+        border: 0;
+        border-radius: 8px;
+        padding: 0.7rem 1.4rem;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="place">Museo CTRL+Alt, Pavia</p>
+        <h1>Questa pagina non c'è</h1>
+        <p class="intro">L'indirizzo è sbagliato, oppure la pagina non è più sul sito.</p>
+      </div>
+    </header>
+    <main>
+      <button type="button" onclick="history.back()">Torna indietro</button>
+    </main>
+  </body>
+</html>

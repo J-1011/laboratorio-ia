@@ -1,0 +1,27 @@
+# Everything here stays on this computer and never goes to GitHub.
+# What does go: the .html files, static/, contenuti/, .nojekyll and the guides.
+
+# The teacher folder. Left out until the repository is known to be private: in a
+# public repository its name, and so the teacher page, would be visible to anyone.
+# Delete this line only for a private repository.
+/docenti-*/
+
+# The old Flask version
+/archivio/
+
+# The notebooks' Python environment and the original lesson material
+/lesson_env/
+/resources/
+/lezione */
+
+# Files that Jupyter, editors, Office and Windows create by themselves
+.ipynb_checkpoints/
+.vscode/
+.vercel/
+.venv/
+__pycache__/
+~$*
+*.tmp
+Thumbs.db
+desktop.ini
+.DS_Store
