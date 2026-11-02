@@ -118,11 +118,15 @@ correggere, per esempio:
 contenuti/lezione-4/lezione.js, quiz, domanda 2: 'corretta' vale 'e', ma le opzioni sono: a, b, c
 ```
 
-### Mettere i materiali veri della lezione 1
+### Aggiornare un materiale
 
-I file in `contenuti/lezione-1/` sono ancora dei segnaposto. Per mettere quelli veri,
-salvarli al loro posto con gli stessi nomi: `slide-medie.pdf`, `slide-superiori.pdf` e
-`laboratorio.ipynb`. Per i documenti dei docenti vedere il punto 6.
+Per sostituire le slide o il notebook di una lezione, salvare il file nuovo al posto di
+quello vecchio, con lo stesso nome, per esempio `contenuti/lezione-1/slide-medie.pdf`.
+Per i documenti dei docenti vedere il punto 6.
+
+Prima di pubblicare un notebook, conviene controllare che i risultati salvati nelle celle
+non mostrino percorsi del proprio computer, come `C:\Users\...`. Il comando *Clear All
+Outputs* di VS Code li toglie tutti.
 
 ## 4. Cambiare un quiz
 
