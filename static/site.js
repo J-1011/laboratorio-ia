@@ -154,6 +154,13 @@ function validateLesson(folder, raw) {
   if (!Number.isInteger(data.numero) || data.numero < 1) {
     throw new ContentError(`${where}: 'numero' deve essere un intero maggiore di zero`);
   }
+  let interactiveFile = null;
+  if (data.interattiva !== undefined) {
+    interactiveFile = fileName(data, "interattiva", where);
+    if (!interactiveFile.toLowerCase().endsWith(".js")) {
+      throw new ContentError(`${where}: 'interattiva' deve essere un file .js, non '${interactiveFile}'`);
+    }
+  }
   return {
     number: data.numero,
     folder,
@@ -164,6 +171,7 @@ function validateLesson(folder, raw) {
       validateMaterial(entry, `${where}, materiale ${index + 1}`)
     ),
     quiz: validateQuiz(data.quiz, `${where}, quiz`),
+    interactiveFile,
   };
 }
 
@@ -413,6 +421,18 @@ function renderLesson(lessons) {
       )
     );
     main.append(section);
+  }
+
+  if (lesson.interactiveFile) {
+    main.append(
+      el("h2", {}, "Lezione interattiva"),
+      el("p", {}, "Ripercorri le slide da solo, un passo alla volta: in ogni slide c'è qualcosa da fare."),
+      el(
+        "p",
+        { class: "actions" },
+        el("a", { class: "button", href: `interattiva.html?n=${lesson.number}` }, "Apri la lezione interattiva")
+      )
+    );
   }
 
   main.append(

@@ -14,6 +14,7 @@ registerLesson({
       // colab: "https://colab.research.google.com/...",   // optional, adds the Colab button
     },
   ],
+  interattiva: "interattiva.js",
   quiz: {
     titolo: "Quiz della lezione 1",
     domande: [
