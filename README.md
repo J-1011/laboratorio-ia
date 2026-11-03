@@ -34,7 +34,7 @@ Il sito si pubblica tramite git: il servizio prende i file dal repository. **Non
 la cartella a mano**: contiene anche `lesson_env/`, `resources/` e i materiali originali
 delle lezioni, che il file `.gitignore` tiene fuori dal repository.
 
-Prima di pubblicare, leggere il punto 6 sulla pagina per i docenti.
+Prima di pubblicare, leggere il punto 7 sulla pagina per i docenti.
 
 **GitHub Pages.** Nel repository, aprire **Settings > Pages** e scegliere di pubblicare dal
 ramo principale, cartella `/ (root)`. Il sito compare dopo qualche minuto all'indirizzo
@@ -56,6 +56,7 @@ contenuti/
   elenco.js             l'elenco delle cartelle delle lezioni
   lezione-4/
     lezione.js          scheda, materiali e quiz della lezione
+    interattiva.js      facoltativo: la versione interattiva delle slide (punto 5)
     slide.pdf
     laboratorio.ipynb
 ```
@@ -79,6 +80,7 @@ contenuti/
          colab: "https://colab.research.google.com/...", // facoltativo: aggiunge il pulsante Colab
        },
      ],
+     interattiva: "interattiva.js", // facoltativo: vedi il punto 5
      quiz: {
        titolo: "Quiz della lezione 4",
        domande: [
@@ -122,7 +124,7 @@ contenuti/lezione-4/lezione.js, quiz, domanda 2: 'corretta' vale 'e', ma le opzi
 
 Per sostituire le slide o il notebook di una lezione, salvare il file nuovo al posto di
 quello vecchio, con lo stesso nome, per esempio `contenuti/lezione-1/slide-medie.pdf`.
-Per i documenti dei docenti vedere il punto 6.
+Per i documenti dei docenti vedere il punto 7.
 
 Prima di pubblicare un notebook, conviene controllare che i risultati salvati nelle celle
 non mostrino percorsi del proprio computer, come `C:\Users\...`. Il comando *Clear All
@@ -159,7 +161,89 @@ Regole:
 Le risposte giuste stanno nel file della lezione, quindi chi apre il codice della pagina
 può vederle. Per un quiz di autoverifica, senza voti, va bene così.
 
-## 5. I risultati del quiz
+## 5. La versione interattiva delle slide
+
+Una lezione può avere anche una versione interattiva delle slide: lo studente le ripercorre
+da solo, un passo alla volta, e in ogni slide deve fare qualcosa. Sulla pagina della lezione
+compare il pulsante **Apri la lezione interattiva**.
+
+Per aggiungerla:
+
+1. Creare nella cartella della lezione il file `interattiva.js`. Conviene partire da una copia
+   di `contenuti/lezione-1/interattiva.js`.
+2. In `lezione.js`, aggiungere `interattiva: "interattiva.js",` prima di `quiz`.
+
+Il file elenca le slide, in ordine. Ogni slide ha un titolo e dei passi, che compaiono uno
+alla volta quando lo studente preme **Continua**:
+
+```js
+registerInteractive({
+  slide: [
+    {
+      titolo: "Proviamo noi",
+      superiori: true, // facoltativo: la slide è segnata «Per le superiori» e si può saltare
+      passi: [
+        {
+          mostra: [{ tipo: "frase", testo: "Chi dorme non piglia ___" }],
+          attivita: {
+            tipo: "completa",
+            attese: [{ parole: ["pesci"], risposta: "Proprio così!" }],
+            altrimenti: "Quasi tutti dicono «pesci».",
+          },
+          poi: [{ tipo: "testo", testo: "Questo compare **dopo** la risposta." }],
+        },
+      ],
+    },
+  ],
+});
+```
+
+Regole:
+
+- Ogni slide ha almeno un'attività. **Avanti** si sblocca solo quando la slide è finita.
+- `mostra` è quello che compare con il passo, `attivita` è quello che lo studente deve fare,
+  `poi` compare dopo la risposta. Un passo può anche solo mostrare.
+- Nei testi, `**parola**` diventa grassetto.
+
+**Che cosa si può mostrare**, in `mostra` e in `poi`:
+
+| `tipo` | Che cosa mostra | Campi |
+|---|---|---|
+| `testo` | un paragrafo | `testo` |
+| `grande` | una frase grande, su sfondo arancione | `testo`; `stile: "scuro"` per lo sfondo blu |
+| `scheda` | un riquadro con un titolo | `titolo`; facoltativi `etichetta`, `testo` e `dopo`, l'etichetta che prende dopo la risposta |
+| `frase` | una frase con uno spazio vuoto, scritto `___` | `testo`. Dopo la risposta lo spazio si riempie |
+| `barre` | un grafico a barre | `voci: [{ parola, percento }]`; facoltativo `evidenzia` (vedi sotto) |
+| `pezzi` | una frase tagliata in pezzetti | `voci: [{ testo, numero }]`, con `numero` facoltativo |
+| `mappa` | parole sparse su una mappa | `parole: [{ parola, x, y, gruppo }]`, con `x` e `y` da 0 a 100 e `gruppo` 1, 2 o 3 per il colore; facoltativo `dopo`, parole che compaiono dopo la risposta |
+| `flusso` | una catena di passaggi, dall'alto in basso | `voci: [{ etichetta, titolo, testo }]`; facoltativi `entra`, `nome` ed `esce` |
+| `tabella` | una tabella | `colonne: [...]` e `righe: [[...], ...]`, con lo stesso numero di caselle |
+| `temperatura` | la manopola della temperatura, con le barre | `voci: [{ parola, punteggio }]` |
+| `disegno` | un disegno già pronto | `nome: "studente"`; facoltativo `didascalia` |
+
+**Che cosa può fare lo studente**, in `attivita`:
+
+| `tipo` | Che cosa fa | Campi |
+|---|---|---|
+| `scelta` | sceglie una risposta | `domanda` e `opzioni: [{ testo, risposta, giusta }]`. Se un'opzione ha `giusta: true`, la scelta viene corretta come in un quiz; se nessuna ce l'ha, è un sondaggio |
+| `completa` | scrive una parola | `altrimenti`; facoltativi `domanda`, `attese: [{ parole, risposta }]` e `ricorda` |
+| `parole` | tocca le parole di una frase che rispondono alla domanda | `testo`, `domanda`, `giuste: [...]` e `risposta`; facoltativo `parola`, la parola di cui si parla, che non si può toccare |
+| `dado` | tira un dado truccato | `domanda`, `voci: [{ parola, percento }]`, `lanci` (da 1 a 20) e `risposta` |
+
+In `completa`, una risposta vale se contiene una delle `parole`. Maiuscole, punteggiatura e
+articolo iniziale non contano: «Un bagno!» vale come «bagno». Se non ne contiene nessuna, lo
+studente legge `altrimenti`. Con `ricorda: "mare"` il sito si ricorda la parola scritta, e più
+avanti un blocco `barre` con `evidenzia: "mare"` segna la barra di quella parola.
+
+Sul telefono la mappa mette ogni parola su una riga sua, in ordine di `y`, perché sullo schermo
+stretto le parole si coprirebbero.
+
+Come per il quiz, le risposte restano solo nella scheda del browser: si vedono ancora se lo
+studente ricarica la pagina, e spariscono quando chiude la scheda. Se il file ha un errore,
+la pagina interattiva mostra l'**Avviso per chi gestisce il sito** con la slide e il passo da
+correggere. La pagina della lezione e il quiz funzionano lo stesso.
+
+## 6. I risultati del quiz
 
 Il sito non salva le risposte da nessuna parte e non manda niente a nessuno. Il risultato
 resta solo nella scheda del browser dove lo studente ha fatto il quiz, così si vede ancora
@@ -169,7 +253,7 @@ lo cancella subito.
 Il risultato non resta nel browser dopo la chiusura della scheda di proposito: sui computer
 del museo, lo studente dopo non deve trovare le risposte di quello prima.
 
-## 6. La pagina per i docenti
+## 7. La pagina per i docenti
 
 I documenti per i docenti stanno in una cartella con un nome casuale, che inizia con
 `docenti-`. Il suo indirizzo è quello del sito più il nome della cartella, per esempio:
@@ -198,18 +282,19 @@ repository privato, come Vercel.
 Per cambiare l'indirizzo basta rinominare la cartella, usando solo lettere, numeri, `-` e
 `_`, e dare ai docenti il nuovo link.
 
-## 7. I caratteri
+## 8. I caratteri
 
 Il sito usa gli stessi caratteri delle slide se i file sono nella cartella `static/fonts/`.
 Senza, usa quelli del computer e funziona lo stesso. Il file `static/fonts/README.md` dice
 quali file servono e dove trovarli.
 
-## 8. Se qualcosa non va
+## 9. Se qualcosa non va
 
 | Cosa succede | Cosa fare |
 |---|---|
 | La pagina resta vuota | JavaScript è disattivato nel browser, oppure c'è un errore: premere `F12` e guardare la scheda *Console*. |
 | In cima alla pagina iniziale c'è l'**Avviso per chi gestisce il sito** | Leggere la riga: dice quale file correggere e cosa non va. |
+| La lezione interattiva mostra l'**Avviso per chi gestisce il sito** | Leggere la riga: dice quale slide e quale passo di `interattiva.js` correggere. |
 | Sul computer funziona, online no | Controllare maiuscole e minuscole nei nomi dei file. Se la modifica è appena stata mandata, aspettare qualche minuto e premere `Ctrl+F5`. |
 | Le modifiche non si vedono | Ricaricare con `Ctrl+F5`. |
 | Sul telefono le slide non si vedono | Molti browser del telefono non mostrano i PDF dentro la pagina: usare il pulsante **Scarica**. |

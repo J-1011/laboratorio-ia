@@ -32,10 +32,10 @@ overturning them.
 
 Equally fixed:
 
-- **Store nothing that could identify a student.** The quiz keeps the chosen answers only in
-  that tab's `sessionStorage`, so a reload still shows the result. Never `localStorage`: on a
-  shared museum computer the next student must not find the previous student's answers.
-  Nothing ever leaves the browser.
+- **Store nothing that could identify a student.** The quiz and the interactive lesson keep the
+  answers given only in that tab's `sessionStorage`, so a reload still shows them. Never
+  `localStorage`: on a shared museum computer the next student must not find the previous
+  student's answers. Nothing ever leaves the browser.
 - **The quiz is scored in the browser.** The right answers are visible in the page source. That
   is accepted for a self-check quiz with no grades.
 - **Teacher documents live in an unlisted folder**, `docenti-<random>/`, with no password and a
@@ -44,7 +44,8 @@ Equally fixed:
   Document it as an unlisted address, never as security.
 - **A bad content file never hides the others.** Each lesson is its own file. A broken one is
   skipped and listed at the top of the home page, naming the file and the problem, and in the
-  console.
+  console. A lesson's interactive file is checked only when its page opens: a broken one shows
+  the same notice there, and the lesson page and the quiz keep working.
 - **The look matches the lesson slides.** Palette: `#141B2D` navy, `#F7F5F0` paper, `#E8622C`
   orange, `#2D7D8A` teal, `#4A5568` secondary text. Headings in Rubik, body in IBM Plex Sans,
   labels in IBM Plex Mono, loaded with `@font-face` from `static/fonts/` if the files are there,
@@ -55,12 +56,14 @@ Equally fixed:
 
 | Path | Purpose |
 |---|---|
-| `index.html`, `lezione.html`, `quiz.html` | The three page shells. `static/site.js` fills them |
+| `index.html`, `lezione.html`, `quiz.html`, `interattiva.html` | The page shells. `static/site.js` fills them |
 | `404.html` | Self-contained, because hosts serve it at any depth |
 | `static/site.js` | Loads and checks the content, draws every page, scores the quiz |
+| `static/interattiva.js` | The interactive lesson: checks a lesson's interactive file, draws its slides step by step |
 | `static/style.css`, `static/fonts/` | The one stylesheet, and the folder for the optional fonts |
 | `contenuti/elenco.js` | The list of lesson folders |
 | `contenuti/<folder>/lezione.js` | One lesson: card, materials and quiz, via `registerLesson()` |
+| `contenuti/<folder>/interattiva.js` | Optional: the lesson's slides as activities, via `registerInteractive()` |
 | `docenti-<random>/` | The teacher page, `documenti.js` and one subfolder of documents per lesson |
 | `.nojekyll` | Stops GitHub Pages from running Jekyll over the files |
 | `README.md` | The Italian guide for the people who run the site. Keep it true |
@@ -84,7 +87,19 @@ material), `resources/` or `archivio/`. They are git-ignored and are not part of
 - **No `required` on the quiz radios.** The browser's message would follow the browser's
   language. The site shows its own Italian message and keeps the answers given.
 - **Saved answers are checked against the current quiz** before being shown, so a changed quiz
-  or a damaged value just shows an empty form.
+  or a damaged value just shows an empty form. The interactive lesson does the same with its
+  saved progress, down to each step before the current one being finished.
+- **The interactive file is loaded only by `interattiva.html`**, after `lezione.js`, so a broken
+  one cannot reach the home page, the lesson page or the quiz.
+- **`fitBlank()`.** A student who types «un tuffo» after «ho fatto un ___» would otherwise read
+  «ho fatto un un tuffo».
+- **The word map places words with the `translate` property, not `transform`.** The fade-in
+  animation sets `transform`, and would move the word. Below 40em each word gets a row of its
+  own (`--row`, `--rows`), because at phone width the same coordinates made words overlap.
+- **`data-focus` on the die's button.** Every throw redraws the slide; without it, keyboard
+  focus would fall back to the top of the page after each throw.
+- **The temperature dial's position lives in `view.dials`**, outside the saved progress. An
+  answer redraws the slide, and the dial must not jump back to 1.
 - **`--orange-dark` and navy text on orange.** `#E8622C` fails contrast for small text and under
   white text. Navy on orange is also what the slides do.
 
