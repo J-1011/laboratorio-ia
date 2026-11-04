@@ -181,7 +181,7 @@ registerInteractive({
   slide: [
     {
       titolo: "Proviamo noi",
-      superiori: true, // facoltativo: la slide è segnata «Per le superiori» e si può saltare
+      superiori: true, // facoltativo: la slide è segnata «Per le superiori», con il pulsante per saltarla
       passi: [
         {
           mostra: [{ tipo: "frase", testo: "Chi dorme non piglia ___" }],
@@ -214,11 +214,16 @@ Regole:
 | `scheda` | un riquadro con un titolo | `titolo`; facoltativi `etichetta`, `testo` e `dopo`, l'etichetta che prende dopo la risposta |
 | `frase` | una frase con uno spazio vuoto, scritto `___` | `testo`. Dopo la risposta lo spazio si riempie |
 | `barre` | un grafico a barre | `voci: [{ parola, percento }]`; facoltativo `evidenzia` (vedi sotto) |
-| `pezzi` | una frase tagliata in pezzetti | `voci: [{ testo, numero }]`, con `numero` facoltativo |
+| `pezzi` | una frase tagliata in pezzetti | `voci: [{ testo, numero }]`, con `numero` facoltativo. Se i pezzi hanno il numero, quando compaiono si vede prima la frase intera, poi i tagli, poi i numeri |
 | `mappa` | parole sparse su una mappa | `parole: [{ parola, x, y, gruppo }]`, con `x` e `y` da 0 a 100 e `gruppo` 1, 2 o 3 per il colore; facoltativo `dopo`, parole che compaiono dopo la risposta |
+| `spazio` | parole in uno spazio a tre dimensioni, che lo studente può girare | `parole: [{ parola, x, y, z, gruppo }]`, con `x`, `y` e `z` da 0 a 100 (`y` è l'altezza); facoltativi `dopo`, come nella `mappa`, e `vicine` e `lontane`, due parole ciascuno, unite da una linea tratteggiata |
 | `flusso` | una catena di passaggi, dall'alto in basso | `voci: [{ etichetta, titolo, testo }]`; facoltativi `entra`, `nome` ed `esce` |
-| `tabella` | una tabella | `colonne: [...]` e `righe: [[...], ...]`, con lo stesso numero di caselle |
+| `tabella` | una tabella | `colonne: [...]` e `righe: [[...], ...]`, con lo stesso numero di caselle. Va bene per pochi numeri o parole brevi: sul telefono una tabella con testi lunghi esce dallo schermo |
 | `temperatura` | la manopola della temperatura, con le barre | `voci: [{ parola, punteggio }]` |
+| `bilancia` | una manopola fra due o più numeri, per esempio sicurezza e comodità | `misure: [{ nome, su }]`, con `su` il valore più alto; `livelli: [{ nome, valori }]`, con un valore per ogni misura; facoltativo `etichetta` |
+| `dialogo` | uno scambio di battute, una riga per chi parla | `righe: [{ chi, testo }]`; facoltativo `dopo`, righe che compaiono dopo la risposta |
+| `nastro` | il testo che arriva al modello, diviso nei suoi pezzi | `voci: [{ etichetta, testo }]`, almeno due; con `unito: true` i pezzi stanno tutti attaccati, senza etichette |
+| `documento` | un documento, anche con righe nascoste | `righe: [{ testo, nascosta }]`; facoltativi `etichetta` e `dopo`, l'etichetta che prende dopo la risposta. Una riga con `nascosta: true` è scritta in bianco su bianco: si vede solo selezionando il testo, e dopo la risposta diventa arancione |
 | `disegno` | un disegno già pronto | `nome: "studente"`; facoltativo `didascalia` |
 
 **Che cosa può fare lo studente**, in `attivita`:
@@ -228,7 +233,10 @@ Regole:
 | `scelta` | sceglie una risposta | `domanda` e `opzioni: [{ testo, risposta, giusta }]`. Se un'opzione ha `giusta: true`, la scelta viene corretta come in un quiz; se nessuna ce l'ha, è un sondaggio |
 | `completa` | scrive una parola | `altrimenti`; facoltativi `domanda`, `attese: [{ parole, risposta }]` e `ricorda` |
 | `parole` | tocca le parole di una frase che rispondono alla domanda | `testo`, `domanda`, `giuste: [...]` e `risposta`; facoltativo `parola`, la parola di cui si parla, che non si può toccare |
+| `righe` | tocca le righe di un testo che rispondono alla domanda | `domanda`, `righe: [{ testo, giusta }]`, con almeno una `giusta: true`, e `risposta` |
 | `dado` | tira un dado truccato | `domanda`, `voci: [{ parola, percento }]`, `lanci` (da 1 a 20) e `risposta` |
+| `filtro` | scrive un messaggio, e un filtro lo controlla come nel laboratorio | `domanda`; `cerca: [...]`, le parole che il filtro blocca; `bloccato` e `passa`, il testo per ognuno dei due casi; facoltativo `compatto: true`, che prima toglie spazi, trattini e punti. Lo studente può riprovare, fino a 8 volte |
+| `approva` | dice sì o no a una serie di richieste, una alla volta | `domanda`; `richieste: [{ titolo, testo, pericolosa }]`, con almeno una `pericolosa: true` e `titolo` facoltativo; `fermata` e `passata`, il testo se le ha bloccate tutte e quello se ne ha approvata una |
 
 In `completa`, una risposta vale se contiene una delle `parole`. Maiuscole, punteggiatura e
 articolo iniziale non contano: «Un bagno!» vale come «bagno». Se non ne contiene nessuna, lo
@@ -236,7 +244,12 @@ studente legge `altrimenti`. Con `ricorda: "mare"` il sito si ricorda la parola 
 avanti un blocco `barre` con `evidenzia: "mare"` segna la barra di quella parola.
 
 Sul telefono la mappa mette ogni parola su una riga sua, in ordine di `y`, perché sullo schermo
-stretto le parole si coprirebbero.
+stretto le parole si coprirebbero. Lo `spazio` invece cambia forma per riempire il riquadro,
+largo sul monitor e alto sul telefono, e una parola che ne coprirebbe un'altra si sposta sopra
+o accanto al suo puntino, o un po' più in là, unita al puntino da una linea sottile.
+
+Una slide `superiori` ha in alto, accanto all'etichetta «Per le superiori», il pulsante
+**Salta questa slide**.
 
 Come per il quiz, le risposte restano solo nella scheda del browser: si vedono ancora se lo
 studente ricarica la pagina, e spariscono quando chiude la scheda. Se il file ha un errore,

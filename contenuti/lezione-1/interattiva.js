@@ -108,11 +108,7 @@ registerInteractive({
         {
           mostra: [
             { tipo: "testo", testo: "Immagina uno studente che ha letto tantissimo: libri, siti, giornali, conversazioni." },
-            {
-              tipo: "disegno",
-              nome: "studente",
-              didascalia: "Immagine ispirata a Sara Zan, «Explain me LLMs like I'm five» (2024)",
-            },
+            { tipo: "disegno", nome: "studente" },
           ],
           attivita: {
             tipo: "scelta",
@@ -432,7 +428,12 @@ registerInteractive({
               testo: "Per arrivare a quella lista di numeri, il computer fa **tre lavori**, uno dopo l'altro. Adesso li apriamo uno per uno.",
             },
             { tipo: "scheda", etichetta: "01", titolo: "Le parole diventano numeri", testo: "Il computer non sa leggere. Sa solo contare." },
-            { tipo: "scheda", etichetta: "02", titolo: "L'attenzione guarda la frase", testo: "Quali parole della frase contano davvero?" },
+            {
+              tipo: "scheda",
+              etichetta: "02",
+              titolo: "L'«attenzione»",
+              testo: "Si chiama così, ma non è l'attenzione che fai tu in classe. Che cos'è, allora? Lo scopri tra poco.",
+            },
             { tipo: "scheda", etichetta: "03", titolo: "Esce la lista dei numeri", testo: "Un voto per ogni parola che conosce." },
           ],
           attivita: {
@@ -443,7 +444,7 @@ registerInteractive({
                 testo: "Le parole diventano numeri",
                 risposta: "Sembra il più facile, ma senza numeri il computer non può fare niente: è da lì che comincia tutto.",
               },
-              { testo: "L'attenzione", risposta: "Hai buon fiuto: l'attenzione è il cuore di tutta la macchina." },
+              { testo: "L'«attenzione»", risposta: "Hai buon fiuto: l'«attenzione» è il cuore di tutta la macchina." },
               {
                 testo: "La lista dei numeri",
                 risposta: "Sembra il più semplice, eppure lì c'è la decisione più interessante della lezione.",
@@ -455,7 +456,7 @@ registerInteractive({
           mostra: [
             {
               tipo: "testo",
-              testo: "L'attenzione è il cuore del **Transformer**: l'architettura con cui sono costruite tutte queste IA.",
+              testo: "L'«attenzione» è il cuore del **Transformer**: l'architettura con cui sono costruite tutte queste IA.",
             },
           ],
           attivita: {
@@ -477,6 +478,10 @@ registerInteractive({
           mostra: [
             { tipo: "testo", testo: "Gli stessi tre lavori, visti dentro la macchina. Segui la frase dall'alto in basso." },
             {
+              tipo: "testo",
+              testo: "Se adesso non ti è tutto chiaro, niente paura: nelle prossime slide **spieghiamo ogni pezzo**, uno alla volta. Per ora basta il disegno d'insieme.",
+            },
+            {
               tipo: "flusso",
               entra: "Ieri sono andato al",
               nome: "TRANSFORMER",
@@ -488,7 +493,7 @@ registerInteractive({
                 },
                 {
                   etichetta: "02 · × 12 VOLTE",
-                  titolo: "L'attenzione guarda la frase",
+                  titolo: "L'«attenzione»",
                   testo: "Questo pezzo non c'è una volta sola: è ripetuto uguale, uno sopra l'altro.",
                 },
                 { etichetta: "03", titolo: "Esce la lista dei numeri", testo: "Un voto per ogni parola che conosce." },
@@ -498,7 +503,7 @@ registerInteractive({
           ],
           attivita: {
             tipo: "scelta",
-            domanda: "Quante volte fa il secondo lavoro, l'attenzione?",
+            domanda: "Quante volte fa il secondo lavoro, l'«attenzione»?",
             opzioni: [
               { testo: "Una volta", risposta: "Guarda l'etichetta: «× 12 volte». È ripetuto uguale, uno sopra l'altro." },
               { testo: "12 volte", risposta: "È ripetuto uguale, uno sopra l'altro.", giusta: true },
@@ -633,14 +638,14 @@ registerInteractive({
             {
               tipo: "mappa",
               parole: [
-                { parola: "frutta", x: 35, y: 10, gruppo: 2 },
-                { parola: "pera", x: 15, y: 15, gruppo: 2 },
-                { parola: "razzo", x: 88, y: 20, gruppo: 3 },
-                { parola: "mela", x: 25, y: 45, gruppo: 2 },
-                { parola: "computer", x: 60, y: 45, gruppo: 1 },
-                { parola: "banana", x: 12, y: 75, gruppo: 2 },
-                { parola: "arancia", x: 38, y: 80, gruppo: 2 },
-                { parola: "autostrada", x: 88, y: 80, gruppo: 3 },
+                { parola: "pera", x: 22, y: 10, gruppo: 2 },
+                { parola: "razzo", x: 88, y: 18, gruppo: 3 },
+                { parola: "frutta", x: 4, y: 36, gruppo: 2 },
+                { parola: "mela", x: 41, y: 48, gruppo: 2 },
+                { parola: "computer", x: 61, y: 48, gruppo: 1 },
+                { parola: "banana", x: 10, y: 72, gruppo: 2 },
+                { parola: "autostrada", x: 88, y: 82, gruppo: 3 },
+                { parola: "arancia", x: 26, y: 90, gruppo: 2 },
               ],
             },
           ],
@@ -665,24 +670,33 @@ registerInteractive({
       ],
     },
     {
-      titolo: "Vicine o lontane",
+      titolo: "Vicine o lontane: lo spazio delle parole",
       passi: [
         {
           mostra: [
-            { tipo: "testo", testo: "Ecco tre gruppi di parole. **Quanto sono vicine** dice quanto si somigliano." },
             {
-              tipo: "mappa",
+              tipo: "testo",
+              testo: "Le parole non stanno su un foglio, ma in uno **spazio**, con tre direzioni: larghezza, altezza e profondità. **Quanto sono vicine** dice quanto si somigliano.",
+            },
+            {
+              tipo: "testo",
+              testo: "Trascina lo spazio con il mouse o con il dito, oppure usa il cursore: si gira, e lo guardi da un altro lato.",
+            },
+            {
+              tipo: "spazio",
               parole: [
-                { parola: "pera", x: 62, y: 8, gruppo: 2 },
-                { parola: "mela", x: 45, y: 12, gruppo: 2 },
-                { parola: "banana", x: 55, y: 30, gruppo: 2 },
-                { parola: "gatto", x: 28, y: 38, gruppo: 1 },
-                { parola: "razzo", x: 88, y: 40, gruppo: 3 },
-                { parola: "cane", x: 12, y: 50, gruppo: 1 },
-                { parola: "cavallo", x: 20, y: 72, gruppo: 1 },
-                { parola: "autostrada", x: 90, y: 85, gruppo: 3 },
+                { parola: "mela", x: 42, y: 84, z: 38, gruppo: 2 },
+                { parola: "pera", x: 62, y: 92, z: 24, gruppo: 2 },
+                { parola: "banana", x: 56, y: 70, z: 58, gruppo: 2 },
+                { parola: "cane", x: 10, y: 34, z: 60, gruppo: 1 },
+                { parola: "gatto", x: 24, y: 46, z: 36, gruppo: 1 },
+                { parola: "cavallo", x: 16, y: 12, z: 78, gruppo: 1 },
+                { parola: "razzo", x: 86, y: 56, z: 18, gruppo: 3 },
+                { parola: "autostrada", x: 92, y: 8, z: 72, gruppo: 3 },
               ],
-              dopo: [{ parola: "tigre", x: 36, y: 56, gruppo: 1 }],
+              dopo: [{ parola: "tigre", x: 30, y: 26, z: 58, gruppo: 1 }],
+              vicine: ["cane", "gatto"],
+              lontane: ["cavallo", "razzo"],
             },
           ],
           attivita: {
@@ -691,16 +705,16 @@ registerInteractive({
             opzioni: [
               {
                 testo: "Vicino a cane, gatto e cavallo",
-                risposta: "È un animale, come loro: si usa in frasi simili. Eccola sulla mappa.",
+                risposta: "È un animale, come loro: si usa in frasi simili. Eccola nello spazio.",
                 giusta: true,
               },
               {
                 testo: "Vicino a mela, pera e banana",
-                risposta: "«Tigre» si usa in frasi come quelle di cane e gatto: va vicino agli animali. Eccola sulla mappa.",
+                risposta: "«Tigre» si usa in frasi come quelle di cane e gatto: va vicino agli animali. Eccola nello spazio.",
               },
               {
                 testo: "Vicino a razzo e autostrada",
-                risposta: "«Tigre» è un animale: va vicino a cane, gatto e cavallo. Eccola sulla mappa.",
+                risposta: "«Tigre» è un animale: va vicino a cane, gatto e cavallo. Eccola nello spazio.",
               },
             ],
           },
@@ -708,15 +722,15 @@ registerInteractive({
         {
           attivita: {
             tipo: "scelta",
-            domanda: "La mappa vera ha solo due direzioni, come questa?",
+            domanda: "Questo spazio ha tre direzioni. Quello vero, dentro il computer, quante ne ha?",
             opzioni: [
               {
-                testo: "Sì",
-                risposta: "Quella vera ha centinaia di direzioni, a volte migliaia. Sullo schermo ne possiamo disegnare solo due.",
+                testo: "Tre, come questo",
+                risposta: "Molte di più: centinaia, a volte migliaia. Noi non riusciamo a disegnarne più di tre, ma per il computer è solo una lista di numeri più lunga.",
               },
               {
-                testo: "No, ne ha di più",
-                risposta: "Ne ha centinaia, a volte migliaia. Sullo schermo ne possiamo disegnare solo due.",
+                testo: "Centinaia, a volte migliaia",
+                risposta: "Noi non riusciamo a disegnarne più di tre, ma per il computer è solo una lista di numeri più lunga: un numero per ogni direzione.",
                 giusta: true,
               },
             ],
@@ -728,14 +742,14 @@ registerInteractive({
             },
             {
               tipo: "testo",
-              testo: "Una mappa vera, con migliaia di parole in inglese, è su **projector.tensorflow.org**.",
+              testo: "Vuoi vederne uno vero? Apri **projector.tensorflow.org**: ci sono migliaia di parole in inglese. Lì **ogni puntino è una parola**, messa al suo posto in base al significato, proprio come le parole qui sopra. Puntini vicini, parole che si somigliano.",
             },
           ],
         },
       ],
     },
     {
-      titolo: "Mestiere 2: l'attenzione",
+      titolo: "Mestiere 2: l'«attenzione»",
       passi: [
         {
           mostra: [
@@ -763,10 +777,10 @@ registerInteractive({
             risposta: "Sono «andato» e «lago»: si va a pesca, e i pesci stanno nel lago.",
           },
           poi: [
-            { tipo: "grande", testo: "Hai appena fatto tu quello che fa **l'attenzione** del computer." },
+            { tipo: "grande", testo: "Hai appena fatto tu quello che fa **l'«attenzione»** del computer." },
             {
               tipo: "testo",
-              testo: "È come quando prendi appunti: non scrivi ogni parola, scegli quelle che contano. Parole come «il», «di», «che» non pesano quasi niente.",
+              testo: "Ecco perché si chiama così. È come quando prendi appunti: non scrivi ogni parola, scegli quelle che contano. Parole come «il», «di», «che» non pesano quasi niente.",
             },
             {
               tipo: "testo",
@@ -1141,7 +1155,7 @@ registerInteractive({
                 risposta: "Quello è l'ultimo lavoro. Il primo è trasformare le parole in numeri: i token, e il loro posto sulla mappa.",
               },
               {
-                testo: "L'attenzione guarda la frase",
+                testo: "L'«attenzione»",
                 risposta: "Quello è il secondo lavoro. Il primo è trasformare le parole in numeri: i token, e il loro posto sulla mappa.",
               },
             ],
@@ -1150,15 +1164,15 @@ registerInteractive({
         {
           attivita: {
             tipo: "scelta",
-            domanda: "Poi c'è l'attenzione, «× 12 volte». Che cosa vuol dire?",
+            domanda: "Poi c'è l'«attenzione», «× 12 volte». Che cosa vuol dire?",
             opzioni: [
               {
                 testo: "È ripetuta 12 volte, una sopra l'altra",
                 risposta: "Ogni volta guarda di nuovo la frase, e pesa le parole che contano.",
                 giusta: true,
               },
-              { testo: "Legge solo 12 parole", risposta: "Vuol dire che il blocco dell'attenzione è ripetuto 12 volte, uno sopra l'altro." },
-              { testo: "Ci mette 12 secondi", risposta: "Vuol dire che il blocco dell'attenzione è ripetuto 12 volte, uno sopra l'altro." },
+              { testo: "Legge solo 12 parole", risposta: "Vuol dire che il blocco dell'«attenzione» è ripetuto 12 volte, uno sopra l'altro." },
+              { testo: "Ci mette 12 secondi", risposta: "Vuol dire che il blocco dell'«attenzione» è ripetuto 12 volte, uno sopra l'altro." },
             ],
           },
         },
@@ -1188,7 +1202,7 @@ registerInteractive({
                 },
                 {
                   etichetta: "02 · × 12 VOLTE",
-                  titolo: "L'attenzione guarda la frase",
+                  titolo: "L'«attenzione»",
                   testo: "Questo pezzo non c'è una volta sola: è ripetuto uguale, uno sopra l'altro.",
                 },
                 { etichetta: "03", titolo: "Esce la lista dei numeri", testo: "Un voto per ogni parola che conosce." },
@@ -1640,7 +1654,7 @@ registerInteractive({
           mostra: [
             { tipo: "testo", testo: "**01** L'IA indovina la parola dopo. Tutto il resto nasce da qui." },
             { tipo: "testo", testo: "**02** Le parole diventano numeri su una mappa: quelle simili stanno vicine." },
-            { tipo: "testo", testo: "**03** L'attenzione decide quali parole della frase contano di più." },
+            { tipo: "testo", testo: "**03** L'«attenzione» decide quali parole della frase contano di più." },
             { tipo: "testo", testo: "**04** Non esce una parola: esce una lista di numeri. Poi si tira un dado truccato." },
             { tipo: "testo", testo: "**05** Scrive una parola alla volta, e non sa come finirà la frase." },
             {

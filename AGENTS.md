@@ -96,10 +96,27 @@ material), `resources/` or `archivio/`. They are git-ignored and are not part of
 - **The word map places words with the `translate` property, not `transform`.** The fade-in
   animation sets `transform`, and would move the word. Below 40em each word gets a row of its
   own (`--row`, `--rows`), because at phone width the same coordinates made words overlap.
-- **`data-focus` on the die's button.** Every throw redraws the slide; without it, keyboard
-  focus would fall back to the top of the page after each throw.
-- **The temperature dial's position lives in `view.dials`**, outside the saved progress. An
-  answer redraws the slide, and the dial must not jump back to 1.
+- **`data-focus` on the die's button**, on the filter's input after a try, and on «Sì, approvo».
+  Every throw, try or approval redraws the slide; without it, keyboard focus would fall back to
+  the top of the page. Keeping focus on «Sì» is also the lesson: pressing Enter over and over
+  is how real approvals stop being read.
+- **The temperature dial's position lives in `view.dials`**, outside the saved progress, and so
+  do the balance knob's and the word space's angle. An answer redraws the slide, and they must
+  not jump back.
+- **The word space draws its picture in pixels**, sized by a `ResizeObserver`, and lays the
+  words over it as an HTML list. In an SVG scaled with `viewBox` the words would shrink below a
+  readable size on a phone. The box changes shape to fit its frame, and a word that would cover
+  another moves beside its dot, or further out with a leader line: with a fixed cube and labels
+  only below their dots, words overlapped at most angles on a phone.
+  `touch-action: pan-y` lets a finger still scroll the page, and dots are re-ordered by depth
+  only when the order changes, because moving one restarts its fade-in.
+- **`opened` in `answer()`.** Only the answer that finishes an activity fades in what it reveals.
+  Without it, every die throw or filter try would replay the fade-in of the whole step.
+- **The hidden line of a `documento` is white on white on purpose.** It is the trick lesson 2
+  teaches: selecting the text shows it. A contrast check has to leave it out.
+- **The filters of lesson 3 check what the lab's filters check**: the same five words, and for
+  the output filter the same characters removed first. A student goes from the slide to the
+  notebook, and the two must agree.
 - **`--orange-dark` and navy text on orange.** `#E8622C` fails contrast for small text and under
   white text. Navy on orange is also what the slides do.
 
@@ -125,5 +142,6 @@ There is no test suite in the repository. When verifying a change:
   no browser download. Only headless Chrome draws the PDF viewer; Edge shows a grey box.
 - Check at widths from 320 to 1920, with and without the fonts: no horizontal scrolling, readable
   contrast, no request leaving the site, nothing in `localStorage`, and no public file containing
-  the teacher folder's name.
+  the teacher folder's name. In the interactive lessons, also check that no two words of a map
+  or of the word space overlap.
 - `python` on the development machine is 3.10, and `py` defaults to 3.13. Either serves the site.

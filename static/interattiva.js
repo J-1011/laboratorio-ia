@@ -8,14 +8,40 @@
 
 "use strict";
 
-const BLOCK_KINDS = ["testo", "grande", "scheda", "frase", "barre", "pezzi", "mappa", "flusso", "tabella", "temperatura", "disegno"];
-const ACTIVITY_KINDS = ["scelta", "completa", "parole", "dado"];
+const BLOCK_KINDS = [
+  "testo",
+  "grande",
+  "scheda",
+  "frase",
+  "barre",
+  "pezzi",
+  "mappa",
+  "spazio",
+  "flusso",
+  "tabella",
+  "temperatura",
+  "bilancia",
+  "dialogo",
+  "nastro",
+  "documento",
+  "disegno",
+];
+const ACTIVITY_KINDS = ["scelta", "completa", "parole", "righe", "dado", "filtro", "approva"];
 const DRAWINGS = ["studente"];
 const BLANK = /_{3,}/;
 const PROGRESS_PREFIX = "interattiva-";
+const FILTER_TRIES = 8;
+const MESSAGE_LENGTH = 120;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+// How the word space is seen: turned this many degrees at first, from a little above,
+// and with this much perspective (a smaller distance means a stronger one).
+const SPACE_ANGLE = -20;
+const SPACE_TILT = 0.38;
+const SPACE_DISTANCE = 600;
 
 const interactive = { registered: undefined, scriptError: null };
-let dialCount = 0;
+let controlCount = 0;
 
 /* ---- Called by the content file ---- */
 
@@ -69,16 +95,38 @@ function share(data, where) {
   return data.percento;
 }
 
-function mapWord(data, where) {
-  for (const key of ["x", "y"]) {
+function flag(data, key, where) {
+  if (data[key] !== undefined && typeof data[key] !== "boolean") {
+    throw new ContentError(`${where}: '${key}' può essere solo true o false`);
+  }
+  return data[key] === true;
+}
+
+function wholeNumber(data, key, where, lowest, highest) {
+  const value = data[key];
+  if (!Number.isInteger(value) || value < lowest || value > highest) {
+    throw new ContentError(`${where}: '${key}' deve essere un numero intero da ${lowest} a ${highest}`);
+  }
+  return value;
+}
+
+function mapWord(data, where, keys = ["x", "y"]) {
+  const word = { word: text(data, "parola", where) };
+  for (const key of keys) {
     if (typeof data[key] !== "number" || !(data[key] >= 0 && data[key] <= 100)) {
       throw new ContentError(`${where}: '${key}' deve essere un numero da 0 a 100`);
     }
+    word[key] = data[key];
   }
   if (data.gruppo !== undefined && ![1, 2, 3].includes(data.gruppo)) {
     throw new ContentError(`${where}: 'gruppo' può valere solo 1, 2 o 3`);
   }
-  return { word: text(data, "parola", where), x: data.x, y: data.y, group: data.gruppo || 0 };
+  word.group = data.gruppo || 0;
+  return word;
+}
+
+function spaceWord(data, where) {
+  return mapWord(data, where, ["x", "y", "z"]);
 }
 
 function cell(value, where) {
@@ -106,14 +154,12 @@ function validateInteractive(raw, where) {
 
 function validateSlide(raw, where) {
   const data = mapping(raw, where);
-  if (data.superiori !== undefined && typeof data.superiori !== "boolean") {
-    throw new ContentError(`${where}: 'superiori' può essere solo true o false`);
-  }
+  const forSuperiori = flag(data, "superiori", where);
   const steps = items(data, "passi", where).map((entry, index) => validateStep(entry, `${where}, passo ${index + 1}`));
   if (!steps.some((step) => step.activity)) {
     throw new ContentError(`${where}: ogni slide deve chiedere allo studente di fare qualcosa, quindi serve almeno un'attività`);
   }
-  return { title: text(data, "titolo", where), forSuperiori: data.superiori === true, steps };
+  return { title: text(data, "titolo", where), forSuperiori, steps };
 }
 
 function validateStep(raw, where) {
@@ -173,6 +219,59 @@ function validateBlock(raw, where) {
   if (kind === "mappa") {
     const later = data.dopo === undefined ? [] : listOf(data, "dopo", "parola dopo", where, mapWord);
     return { kind, words: listOf(data, "parole", "parola", where, mapWord), later };
+  }
+  if (kind === "spazio") {
+    const words = listOf(data, "parole", "parola", where, spaceWord);
+    const later = data.dopo === undefined ? [] : listOf(data, "dopo", "parola dopo", where, spaceWord);
+    const pair = (key) => {
+      if (data[key] === undefined) return null;
+      const names = data[key];
+      if (!Array.isArray(names) || names.length !== 2 || !names.every((name) => words.some((word) => word.word === name))) {
+        throw new ContentError(`${where}: '${key}' deve elencare due parole che sono in 'parole'`);
+      }
+      return names.map((name) => words.find((word) => word.word === name));
+    };
+    return { kind, words, later, near: pair("vicine"), far: pair("lontane") };
+  }
+  if (kind === "bilancia") {
+    const measures = listOf(data, "misure", "misura", where, (item, at) => ({
+      name: text(item, "nome", at),
+      out: wholeNumber(item, "su", at, 1, 1000),
+    }));
+    if (measures.length > 4) throw new ContentError(`${where}: 'misure' può avere al massimo 4 voci`);
+    const levels = listOf(
+      data,
+      "livelli",
+      "livello",
+      where,
+      (item, at) => {
+        const values = item.valori;
+        if (!Array.isArray(values) || values.length !== measures.length) {
+          throw new ContentError(`${at}: 'valori' deve avere ${measures.length} numeri, uno per ogni misura`);
+        }
+        values.forEach((value, index) => {
+          if (!Number.isInteger(value) || value < 0 || value > measures[index].out) {
+            throw new ContentError(`${at}: il valore ${index + 1} di 'valori' deve essere un numero intero da 0 a ${measures[index].out}`);
+          }
+        });
+        return { name: text(item, "nome", at), values };
+      },
+      2
+    );
+    return { kind, label: optionalText(data, "etichetta", where), measures, levels };
+  }
+  if (kind === "dialogo") {
+    const line = (item, at) => ({ who: text(item, "chi", at), text: text(item, "testo", at) });
+    const later = data.dopo === undefined ? [] : listOf(data, "dopo", "riga dopo", where, line);
+    return { kind, lines: listOf(data, "righe", "riga", where, line), later };
+  }
+  if (kind === "nastro") {
+    const parts = listOf(data, "voci", "voce", where, (item, at) => ({ label: text(item, "etichetta", at), text: text(item, "testo", at) }), 2);
+    return { kind, parts, merged: flag(data, "unito", where) };
+  }
+  if (kind === "documento") {
+    const lines = listOf(data, "righe", "riga", where, (item, at) => ({ text: text(item, "testo", at), hidden: flag(item, "nascosta", at) }));
+    return { kind, label: optionalText(data, "etichetta", where), labelAfter: optionalText(data, "dopo", where), lines };
   }
   if (kind === "flusso") {
     const stages = listOf(data, "voci", "voce", where, (item, at) => ({
@@ -274,12 +373,53 @@ function validateActivity(raw, where) {
     });
     return { kind, question: text(data, "domanda", where), units, right, reply: text(data, "risposta", where) };
   }
+  if (kind === "righe") {
+    const lines = listOf(data, "righe", "riga", where, (item, at) => ({ text: text(item, "testo", at), right: flag(item, "giusta", at) }), 2);
+    if (!lines.some((line) => line.right)) {
+      throw new ContentError(`${where}: almeno una riga deve avere 'giusta: true'`);
+    }
+    return { kind, question: text(data, "domanda", where), lines, reply: text(data, "risposta", where) };
+  }
   if (kind === "dado") {
     const faces = listOf(data, "voci", "voce", where, (item, at) => ({ word: text(item, "parola", at), share: share(item, at) }), 2);
-    if (!Number.isInteger(data.lanci) || data.lanci < 1 || data.lanci > 20) {
-      throw new ContentError(`${where}: 'lanci' deve essere un numero intero da 1 a 20`);
+    const throws = wholeNumber(data, "lanci", where, 1, 20);
+    return { kind, question: text(data, "domanda", where), faces, throws, reply: text(data, "risposta", where) };
+  }
+  if (kind === "filtro") {
+    const words = items(data, "cerca", where).map((word) => {
+      if (typeof word !== "string" || !word.trim()) {
+        throw new ContentError(`${where}: ogni voce di 'cerca' deve essere un testo`);
+      }
+      return word.trim();
+    });
+    return {
+      kind,
+      question: text(data, "domanda", where),
+      words,
+      compact: flag(data, "compatto", where),
+      blocked: text(data, "bloccato", where),
+      passed: text(data, "passa", where),
+    };
+  }
+  if (kind === "approva") {
+    const requests = listOf(
+      data,
+      "richieste",
+      "richiesta",
+      where,
+      (item, at) => ({ title: optionalText(item, "titolo", at), text: text(item, "testo", at), risky: flag(item, "pericolosa", at) }),
+      2
+    );
+    if (!requests.some((request) => request.risky)) {
+      throw new ContentError(`${where}: almeno una richiesta deve avere 'pericolosa: true'`);
     }
-    return { kind, question: text(data, "domanda", where), faces, throws: data.lanci, reply: text(data, "risposta", where) };
+    return {
+      kind,
+      question: text(data, "domanda", where),
+      requests,
+      stopped: text(data, "fermata", where),
+      missed: text(data, "passata", where),
+    };
   }
   throw new ContentError(`${where}: 'tipo' vale '${kind}', ma può essere solo: ${ACTIVITY_KINDS.join(", ")}`);
 }
@@ -299,6 +439,14 @@ function normalizeAnswer(value) {
 // "un bagno caldo" contains the word "bagno"; "bagnino" does not.
 function containsWord(answer, word) {
   return ` ${normalizeAnswer(answer)} `.includes(` ${normalizeAnswer(word)} `);
+}
+
+// The same checks as the filters in the lessons' notebooks: a plain search for each
+// word, so "ignorare" contains "ignora"; with 'compatto', spaces and punctuation are
+// taken out first, so "G-I-O-C-O-N-D-A" contains "gioconda". Gives the word found.
+function filterCatch(activity, message) {
+  const squeeze = (value) => (activity.compact ? value.replace(/[\s\-_.*,:;/\\|]/g, "") : value).toLowerCase();
+  return activity.words.find((word) => squeeze(message).includes(squeeze(word))) || null;
 }
 
 /* ---- Progress ---- */
@@ -369,12 +517,30 @@ function resultFits(result, step) {
     return Number.isInteger(result.choice) && result.choice >= 0 && result.choice < activity.options.length;
   }
   if (activity.kind === "completa") return typeof result.typed === "string" && normalizeAnswer(result.typed) !== "";
-  if (activity.kind === "parole") {
+  if (activity.kind === "parole" || activity.kind === "righe") {
+    const pickable = (unit) =>
+      activity.kind === "parole" ? unit < activity.units.length && activity.units[unit].pickable : unit < activity.lines.length;
     return (
       Array.isArray(result.picked) &&
       result.picked.length > 0 &&
       new Set(result.picked).size === result.picked.length &&
-      result.picked.every((unit) => Number.isInteger(unit) && unit >= 0 && unit < activity.units.length && activity.units[unit].pickable)
+      result.picked.every((unit) => Number.isInteger(unit) && unit >= 0 && pickable(unit))
+    );
+  }
+  if (activity.kind === "filtro") {
+    return (
+      Array.isArray(result.tries) &&
+      result.tries.length > 0 &&
+      result.tries.length <= FILTER_TRIES &&
+      result.tries.every((message) => typeof message === "string" && message.trim() !== "" && message.length <= MESSAGE_LENGTH)
+    );
+  }
+  if (activity.kind === "approva") {
+    return (
+      Array.isArray(result.said) &&
+      result.said.length > 0 &&
+      result.said.length <= activity.requests.length &&
+      result.said.every((value) => typeof value === "boolean")
     );
   }
   return (
@@ -385,9 +551,13 @@ function resultFits(result, step) {
   );
 }
 
-// A die counts as done only after its last throw; any other activity once answered.
+// A die counts as done only after its last throw, and a list of requests once each one
+// has its answer. Any other activity is done once answered.
 function resultComplete(activity, result) {
-  return Boolean(result) && (activity.kind !== "dado" || result.rolls.length === activity.throws);
+  if (!result) return false;
+  if (activity.kind === "dado") return result.rolls.length === activity.throws;
+  if (activity.kind === "approva") return result.said.length === activity.requests.length;
+  return true;
 }
 
 function stepDone(slide, entry, index) {
@@ -459,11 +629,16 @@ function drawBlock(view, block, done, fill, animate) {
     return el("p", { class: "slide__sentence" }, before, blank, rest.join("___"));
   }
   if (block.kind === "barre") return drawBars(view, block, animate);
-  if (block.kind === "pezzi") return drawTokens(block);
+  if (block.kind === "pezzi") return drawTokens(block, animate);
   if (block.kind === "mappa") return drawMap(block, done);
+  if (block.kind === "spazio") return drawSpace(view, block, done);
   if (block.kind === "flusso") return drawFlow(block);
   if (block.kind === "tabella") return drawTable(block);
   if (block.kind === "temperatura") return drawDial(view, block);
+  if (block.kind === "bilancia") return drawBalance(view, block);
+  if (block.kind === "dialogo") return drawDialog(block, done);
+  if (block.kind === "nastro") return drawTape(block);
+  if (block.kind === "documento") return drawDocument(block, done);
   return drawStudent(block);
 }
 
@@ -500,18 +675,23 @@ function drawBars(view, block, animate) {
   return box;
 }
 
-function drawTokens(block) {
+// When the pieces have numbers and the step has just appeared, the stylesheet plays it
+// out: first the whole sentence, then the cuts, then each piece's number in turn.
+function drawTokens(block, animate) {
+  const build = animate && !reducedMotion() && block.pieces.some((piece) => piece.number !== null);
   return el(
     "ul",
-    { class: "tokens" },
-    block.pieces.map((piece) =>
-      el(
+    { class: build ? "tokens tokens--build" : "tokens" },
+    block.pieces.map((piece, index) => {
+      const node = el(
         "li",
         { class: "token" },
         el("span", { class: "token__text" }, piece.text),
         piece.number !== null && el("span", { class: "token__number" }, String(piece.number))
-      )
-    )
+      );
+      node.style.setProperty("--i", index);
+      return node;
+    })
   );
 }
 
@@ -535,6 +715,277 @@ function drawMap(block, done) {
   );
   map.style.setProperty("--rows", shown.length);
   return map;
+}
+
+function svgNode(tag, attributes = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+  return node;
+}
+
+// A point of the word space, 0 to 100 along each side, seen from the front and a little
+// from above, with the box turned 'angle' degrees around its upright side. A positive
+// angle moves the front of the box to the right, like dragging it to the right.
+// 'stretch' makes the box wider and deeper than it is tall, or narrower.
+function projectPoint(point, angle, stretch) {
+  const turn = (angle * Math.PI) / 180;
+  const [x, y, z] = [(point.x - 50) * stretch, point.y - 50, (point.z - 50) * stretch];
+  const across = x * Math.cos(turn) + z * Math.sin(turn);
+  const toward = z * Math.cos(turn) - x * Math.sin(turn);
+  const near = toward * Math.cos(SPACE_TILT) + y * Math.sin(SPACE_TILT);
+  const scale = SPACE_DISTANCE / (SPACE_DISTANCE - near);
+  return { across: across * scale, up: (y * Math.cos(SPACE_TILT) - toward * Math.sin(SPACE_TILT)) * scale, near, scale };
+}
+
+// How far the box reaches from its middle, whichever way it is turned. The drawing's
+// scale comes from this, so that turning the box never makes it grow or shrink.
+const spaceReaches = new Map();
+function spaceExtent(stretch) {
+  if (!spaceReaches.has(stretch)) {
+    const reach = { side: 0, top: 0, bottom: 0 };
+    for (let angle = 0; angle < 360; angle += 5) {
+      for (const x of [0, 100]) for (const y of [0, 100]) for (const z of [0, 100]) {
+        const point = projectPoint({ x, y, z }, angle, stretch);
+        reach.side = Math.max(reach.side, Math.abs(point.across));
+        reach.top = Math.max(reach.top, point.up);
+        reach.bottom = Math.max(reach.bottom, -point.up);
+      }
+    }
+    spaceReaches.set(stretch, reach);
+  }
+  return spaceReaches.get(stretch);
+}
+
+// The box takes the shape that fills its frame best: wide on a monitor, tall on a phone,
+// where the words would otherwise crowd together. Gives the shape and the scale.
+function spaceFit(width, height) {
+  let best = null;
+  for (let tenths = 6; tenths <= 18; tenths += 1) {
+    const stretch = tenths / 10;
+    const reach = spaceExtent(stretch);
+    const unit = Math.min(width / 2 / reach.side, height / (reach.top + reach.bottom));
+    const area = 2 * reach.side * (reach.top + reach.bottom) * unit * unit;
+    if (!best || area > best.area) best = { stretch, unit, reach, area };
+  }
+  return best;
+}
+
+// Words in a box with three directions, drawn in perspective. Dragging the picture or
+// moving the slider turns it. The angle lives in view.dials, like the dial's position,
+// so an answer does not turn the box back. The words are an HTML list laid over the
+// picture: they keep the page's text size at any width, and stay text for screen readers.
+function drawSpace(view, block, done) {
+  controlCount += 1;
+  const id = `spazio-${controlCount}`;
+  let angle = view.dials.has(block) ? view.dials.get(block) : SPACE_ANGLE;
+  const shown = block.words.map((word) => ({ word, later: false }));
+  if (done) shown.push(...block.later.map((word) => ({ word, later: true })));
+
+  const corner = { x: 0, y: 0, z: 0 };
+  const picture = svgNode("svg", { class: "space__picture", "aria-hidden": "true", focusable: "false" });
+  const floor = svgNode("polygon", { class: "space__floor" });
+  const axes = [
+    { x: 100, y: 0, z: 0 },
+    { x: 0, y: 100, z: 0 },
+    { x: 0, y: 0, z: 100 },
+  ].map((end) => ({ end, line: svgNode("path", { class: "space__axis" }) }));
+  const links = [
+    [block.near, "near"],
+    [block.far, "far"],
+  ]
+    .filter(([pair]) => pair)
+    .map(([pair, kind]) => ({ pair, line: svgNode("line", { class: `space__link space__link--${kind}` }) }));
+  const points = shown.map(({ word, later }) => ({
+    word,
+    drop: svgNode("line", { class: "space__drop" }),
+    leader: svgNode("line", { class: "space__leader", visibility: "hidden" }),
+    dot: svgNode("circle", { class: `space__dot space__dot--${word.group}${later ? " space__dot--new" : ""}` }),
+    label: el("li", { class: `space__word space__word--${word.group}${later ? " space__word--new" : ""}` }, word.word),
+  }));
+  picture.append(
+    floor,
+    ...axes.map((axis) => axis.line),
+    ...points.map((point) => point.drop),
+    ...links.map((link) => link.line),
+    ...points.map((point) => point.leader),
+    ...points.map((point) => point.dot)
+  );
+  const stage = el("div", { class: "space__stage" }, picture, el("ul", { class: "space__words" }, points.map((point) => point.label)));
+  const input = el("input", { class: "dial__input", id, type: "range", min: "-180", max: "180", step: "5" });
+
+  let order = "";
+  let fit = null;
+  const place = () => {
+    const width = stage.clientWidth;
+    const height = stage.clientHeight;
+    if (!width || !height) return;
+    // Room is kept along the edges, and below for the words under the lowest dots.
+    const edge = 14;
+    const labelRoom = (points.length ? points[0].label.offsetHeight : 0) + 10;
+    if (!fit || fit.width !== width || fit.height !== height || fit.labelRoom !== labelRoom) {
+      fit = { width, height, labelRoom, ...spaceFit(width - 2 * edge, height - 2 * edge - labelRoom) };
+    }
+    const { stretch, unit, reach } = fit;
+    const middle = edge + reach.top * unit;
+    const at = (point) => {
+      const seen = projectPoint(point, angle, stretch);
+      return { left: width / 2 + seen.across * unit, top: middle - seen.up * unit, near: seen.near, scale: seen.scale };
+    };
+    picture.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const pair = (point) => `${point.left.toFixed(1)},${point.top.toFixed(1)}`;
+    floor.setAttribute(
+      "points",
+      [corner, { x: 100, y: 0, z: 0 }, { x: 100, y: 0, z: 100 }, { x: 0, y: 0, z: 100 }].map((point) => pair(at(point))).join(" ")
+    );
+    const base = at(corner);
+    for (const axis of axes) {
+      const tip = at(axis.end);
+      const length = Math.hypot(tip.left - base.left, tip.top - base.top) || 1;
+      const [dx, dy] = [(tip.left - base.left) / length, (tip.top - base.top) / length];
+      const wing = (side) => pair({ left: tip.left - dx * 9 + side * dy * 5, top: tip.top - dy * 9 - side * dx * 5 });
+      axis.line.setAttribute("d", `M${pair(base)} L${pair(tip)} M${wing(1)} L${pair(tip)} L${wing(-1)}`);
+    }
+    const placed = points.map((point) => ({ point, seen: at(point.word), ground: at({ ...point.word, y: 0 }) }));
+    for (const { point, seen, ground } of placed) {
+      for (const [name, value] of [
+        ["x1", seen.left],
+        ["y1", seen.top],
+        ["x2", ground.left],
+        ["y2", ground.top],
+      ]) {
+        point.drop.setAttribute(name, value.toFixed(1));
+      }
+      point.dot.setAttribute("cx", seen.left.toFixed(1));
+      point.dot.setAttribute("cy", seen.top.toFixed(1));
+      point.dot.setAttribute("r", (5.5 * seen.scale).toFixed(1));
+    }
+    // Each word goes below its dot, or else in the first of the places around it where it
+    // covers no word already placed: first right beside the dot, then one or two steps
+    // further out, joined to the dot by a thin line. If no place is free, it goes where it
+    // covers the least. The nearest words are placed first.
+    const taken = [];
+    const covered = (spot) =>
+      taken.reduce((sum, other) => {
+        const across = Math.min(spot.x + spot.w, other.x + other.w) - Math.max(spot.x, other.x) + 2;
+        const down = Math.min(spot.y + spot.h, other.y + other.h) - Math.max(spot.y, other.y) + 2;
+        return sum + (across > 0 && down > 0 ? across * down : 0);
+      }, 0);
+    for (const { point, seen } of [...placed].sort((a, b) => b.seen.near - a.seen.near)) {
+      const [w, h, gap] = [point.label.offsetWidth, point.label.offsetHeight, 6 * seen.scale + 3];
+      const [left, top] = [seen.left, seen.top];
+      const around = (far) => {
+        const side = 0.7 * far;
+        return [
+          [left - w / 2, top + far],
+          [left - w / 2, top - far - h],
+          [left + far, top - h / 2],
+          [left - far - w, top - h / 2],
+          [left + side, top + side],
+          [left - side - w, top + side],
+          [left + side, top - side - h],
+          [left - side - w, top - side - h],
+        ];
+      };
+      const spots = [...around(gap), ...around(gap + h), ...around(gap + 2 * h)].map(([x, y], index) => ({
+        x: Math.min(Math.max(x, 0), width - w),
+        y: Math.min(Math.max(y, 0), height - h),
+        w,
+        h,
+        out: index >= 8,
+      }));
+      let spot = spots[0];
+      let least = Infinity;
+      for (const candidate of spots) {
+        const amount = covered(candidate);
+        if (amount < least) [spot, least] = [candidate, amount];
+        if (!amount) break;
+      }
+      taken.push(spot);
+      if (spot.out) {
+        const end = { left: Math.min(Math.max(left, spot.x), spot.x + w), top: Math.min(Math.max(top, spot.y), spot.y + h) };
+        for (const [name, value] of [
+          ["x1", left],
+          ["y1", top],
+          ["x2", end.left],
+          ["y2", end.top],
+        ]) {
+          point.leader.setAttribute(name, value.toFixed(1));
+        }
+      }
+      point.leader.setAttribute("visibility", spot.out ? "visible" : "hidden");
+      point.label.style.left = `${spot.x.toFixed(1)}px`;
+      point.label.style.top = `${spot.y.toFixed(1)}px`;
+      point.label.style.zIndex = String(Math.round(seen.near + 200));
+    }
+    for (const link of links) {
+      const [from, to] = link.pair.map((word) => at(word));
+      for (const [name, value] of [
+        ["x1", from.left],
+        ["y1", from.top],
+        ["x2", to.left],
+        ["y2", to.top],
+      ]) {
+        link.line.setAttribute(name, value.toFixed(1));
+      }
+    }
+    // Nearer dots go over farther ones. Moving a dot restarts its fade-in, so they are
+    // put in order again only when the order has changed.
+    const sorted = [...placed].sort((a, b) => a.seen.near - b.seen.near);
+    const now = sorted.map((item) => points.indexOf(item.point)).join(",");
+    if (now !== order) {
+      order = now;
+      for (const item of sorted) picture.append(item.point.dot);
+    }
+  };
+
+  const turnTo = (value) => {
+    angle = ((((value + 180) % 360) + 360) % 360) - 180;
+    view.dials.set(block, angle);
+    input.value = String(Math.round(angle));
+    input.setAttribute("aria-valuetext", `${Math.round(angle)} gradi`);
+    place();
+  };
+  input.addEventListener("input", () => turnTo(Number(input.value)));
+  let drag = null;
+  stage.addEventListener("pointerdown", (event) => {
+    drag = { from: event.clientX, angle };
+    stage.setPointerCapture(event.pointerId);
+  });
+  stage.addEventListener("pointermove", (event) => {
+    if (drag) turnTo(drag.angle + (event.clientX - drag.from) * 0.5);
+  });
+  for (const name of ["pointerup", "pointercancel"]) stage.addEventListener(name, () => (drag = null));
+  // The size is known only once the slide is on the page, and changes with the window.
+  const watch = new ResizeObserver(() => (stage.isConnected ? place() : watch.disconnect()));
+  watch.observe(stage);
+  if (document.fonts) document.fonts.ready.then(() => stage.isConnected && place());
+  turnTo(angle);
+
+  return el(
+    "div",
+    { class: "space", role: "group", "aria-label": "Lo spazio delle parole" },
+    stage,
+    el("div", { class: "space__turn" }, el("label", { class: "dial__label", for: id }, "Gira lo spazio"), input),
+    links.length > 0 &&
+      el(
+        "ul",
+        { class: "space__legend" },
+        block.near &&
+          el(
+            "li",
+            { class: "space__key space__key--near" },
+            el("strong", {}, "Vicine"),
+            `: «${block.near[0].word}» e «${block.near[1].word}», significato simile`
+          ),
+        block.far &&
+          el(
+            "li",
+            { class: "space__key space__key--far" },
+            el("strong", {}, "Lontane"),
+            `: «${block.far[0].word}» e «${block.far[1].word}», significati diversi`
+          )
+      )
+  );
 }
 
 function drawFlow(block) {
@@ -581,8 +1032,8 @@ function drawTable(block) {
 // The temperature knob: the scores go through a softmax after being divided by the
 // temperature. Its position is kept for the page's lifetime, not saved.
 function drawDial(view, block) {
-  dialCount += 1;
-  const id = `temperatura-${dialCount}`;
+  controlCount += 1;
+  const id = `temperatura-${controlCount}`;
   const input = el("input", {
     class: "dial__input",
     id,
@@ -621,6 +1072,95 @@ function drawDial(view, block) {
     input,
     el("p", { class: "dial__ends", "aria-hidden": "true" }, el("span", {}, "bassa"), el("span", {}, "alta")),
     el("div", { class: "bars" }, rows.map((row) => row.row))
+  );
+}
+
+// A knob with a few positions, each giving a value to every measure: the trade-off
+// between two numbers made visible. Its position is kept like the dial's.
+function drawBalance(view, block) {
+  controlCount += 1;
+  const id = `bilancia-${controlCount}`;
+  const last = block.levels.length - 1;
+  const input = el("input", { class: "dial__input", id, type: "range", min: "0", max: String(last), step: "1" });
+  input.value = String(view.dials.has(block) ? view.dials.get(block) : 0);
+  const shown = el("strong", {});
+  const colours = [1, 0, 2, 3];
+  const rows = block.measures.map((measure, index) => {
+    const fill = el("span", { class: `bars__fill bars__fill--${colours[index]}` });
+    const value = el("span", { class: "bars__share" });
+    const row = el(
+      "div",
+      { class: "bars__row balance__row" },
+      el("span", { class: "bars__word" }, measure.name),
+      el("span", { class: "bars__track" }, fill),
+      value
+    );
+    return { fill, value, row };
+  });
+  const update = () => {
+    const position = Number(input.value);
+    const level = block.levels[position];
+    view.dials.set(block, position);
+    shown.textContent = level.name;
+    input.setAttribute("aria-valuetext", level.name);
+    rows.forEach((row, index) => {
+      const measure = block.measures[index];
+      row.fill.style.width = `${(level.values[index] / measure.out) * 100}%`;
+      row.value.textContent = `${level.values[index]} su ${measure.out}`;
+    });
+  };
+  input.addEventListener("input", update);
+  update();
+  return el(
+    "div",
+    { class: "dial balance" },
+    el("label", { class: "dial__label", for: id }, `${block.label || "Posizione"}: `, shown),
+    input,
+    el("p", { class: "dial__ends", "aria-hidden": "true" }, el("span", {}, block.levels[0].name), el("span", {}, block.levels[last].name)),
+    el("div", { class: "bars" }, rows.map((row) => row.row))
+  );
+}
+
+// A short exchange, one line per speaker. The 'dopo' lines join once the step is done.
+function drawDialog(block, done) {
+  const line = (item, later) =>
+    el("p", { class: later ? "dialog__line dialog__line--new" : "dialog__line" }, el("span", { class: "dialog__who" }, `${item.who} →`), " ", item.text);
+  return el(
+    "div",
+    { class: "dialog" },
+    block.lines.map((item) => line(item, false)),
+    done && block.later.map((item) => line(item, true))
+  );
+}
+
+// The text that reaches the model, in its labelled pieces; or, with 'unito', the way
+// the model gets it: one piece, with no labels and no borders.
+function drawTape(block) {
+  if (block.merged) return el("p", { class: "tape tape--merged" }, block.parts.map((part) => part.text).join(" "));
+  return el(
+    "ol",
+    { class: "tape" },
+    block.parts.map((part) =>
+      el("li", { class: "tape__part" }, el("span", { class: "tape__label" }, part.label), el("span", { class: "tape__text" }, part.text))
+    )
+  );
+}
+
+// A document. A hidden line is written white on white, as in the trick the lesson is
+// about: the eye misses it, but selecting the text shows it. Once the step is done, it
+// is shown in orange.
+function drawDocument(block, done) {
+  const after = done && block.labelAfter;
+  const label = after ? block.labelAfter : block.label;
+  return el(
+    "div",
+    { class: "document" },
+    label && el("p", { class: after ? "slide-card__label slide-card__label--after" : "slide-card__label" }, label),
+    block.lines.map((line) => {
+      let kind = "document__line";
+      if (line.hidden) kind += done ? " document__line--found" : " document__line--hidden";
+      return el("p", { class: kind }, line.text);
+    })
   );
 }
 
@@ -670,12 +1210,50 @@ function replyFor(activity, typed) {
   return match ? match.reply : activity.otherwise;
 }
 
+function pickVerdict(found, needed, extra) {
+  if (found === needed && !extra) return "Giusto! ";
+  return found ? "Quasi. " : "Non proprio. ";
+}
+
 function wordsVerdict(activity, picked) {
   const chosen = picked.map((unit) => activity.units[unit].normal);
   const found = activity.right.filter((word) => chosen.includes(word)).length;
   const extra = chosen.filter((word) => !activity.right.includes(word)).length;
-  if (found === activity.right.length && !extra) return "Giusto! ";
-  return found ? "Quasi. " : "Non proprio. ";
+  return pickVerdict(found, activity.right.length, extra);
+}
+
+function linesVerdict(activity, picked) {
+  const found = picked.filter((line) => activity.lines[line].right).length;
+  return pickVerdict(found, activity.lines.filter((line) => line.right).length, picked.length - found);
+}
+
+// A button that is pressed or not, for the activities where several things are tapped.
+function pickButton(className, label, pressed, locked) {
+  const button = el("button", { class: className, type: "button", disabled: locked, "aria-pressed": String(pressed) }, label);
+  if (!locked) {
+    button.addEventListener("click", () => {
+      const on = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(on));
+      button.classList.toggle("choice--chosen", on);
+    });
+  }
+  return button;
+}
+
+// Conferma answers with whatever is pressed, as long as something is.
+function confirmPick(view, entry, index, buttons, box, empty) {
+  const hint = el("p", { class: "fill__hint", "aria-live": "polite" });
+  const confirm = el("button", { class: "button", type: "button" }, "Conferma");
+  confirm.addEventListener("click", () => {
+    const chosen = buttons.filter((item) => item.button.getAttribute("aria-pressed") === "true").map((item) => item.number);
+    if (!chosen.length) {
+      hint.textContent = empty;
+      return;
+    }
+    answer(view, entry, index, { picked: chosen });
+  });
+  box.append(el("p", { class: "actions word-pick__confirm" }, confirm), hint);
+  return box;
 }
 
 // A loaded die: each face comes up as often as its share says.
@@ -703,18 +1281,7 @@ function drawWordPick(view, entry, index, activity, result, box) {
       let state = "";
       if (result && activity.right.includes(unit.normal)) state = " choice--right";
       else if (result && picked.has(number)) state = " choice--wrong";
-      const button = el(
-        "button",
-        { class: `choice word-pick__word${state}`, type: "button", disabled: Boolean(result), "aria-pressed": String(picked.has(number)) },
-        unit.core
-      );
-      if (!result) {
-        button.addEventListener("click", () => {
-          const on = button.getAttribute("aria-pressed") !== "true";
-          button.setAttribute("aria-pressed", String(on));
-          button.classList.toggle("choice--chosen", on);
-        });
-      }
+      const button = pickButton(`choice word-pick__word${state}`, unit.core, picked.has(number), Boolean(result));
       buttons.push({ number, button });
       return el("span", { class: "word-pick__unit" }, unit.lead, button, unit.trail);
     })
@@ -724,17 +1291,130 @@ function drawWordPick(view, entry, index, activity, result, box) {
     box.append(el("p", { class: "activity__reply" }, el("strong", {}, wordsVerdict(activity, result.picked)), activity.reply));
     return box;
   }
+  return confirmPick(view, entry, index, buttons, box, "Tocca almeno una parola.");
+}
+
+// The lines of a text as buttons, in a page: tapping marks them, Conferma answers.
+function drawLinePick(view, entry, index, activity, result, box) {
+  const picked = new Set(result ? result.picked : []);
+  const buttons = [];
+  const page = el(
+    "ol",
+    { class: "line-pick" },
+    activity.lines.map((line, number) => {
+      let state = "";
+      if (result && line.right) state = " choice--right";
+      else if (result && picked.has(number)) state = " choice--wrong";
+      const button = pickButton(`choice line-pick__line${state}`, line.text, picked.has(number), Boolean(result));
+      buttons.push({ number, button });
+      return el("li", {}, button);
+    })
+  );
+  box.append(el("p", { class: "activity__question" }, activity.question), page);
+  if (result) {
+    box.append(el("p", { class: "activity__reply" }, el("strong", {}, linesVerdict(activity, result.picked)), activity.reply));
+    return box;
+  }
+  return confirmPick(view, entry, index, buttons, box, "Tocca almeno una riga.");
+}
+
+// The student writes a message and the filter checks it, as the lab's filter would.
+// Every try is kept and shown with its outcome; there is room for a few more.
+function drawFilter(view, entry, index, activity, result, box) {
+  const tries = result ? result.tries : [];
+  box.append(el("p", { class: "activity__question" }, activity.question));
+  if (tries.length) {
+    box.append(
+      el(
+        "ol",
+        { class: "filter-tries", "aria-label": "I tuoi tentativi" },
+        tries.map((message) => {
+          const caught = filterCatch(activity, message);
+          return el(
+            "li",
+            { class: caught ? "filter-try filter-try--blocked" : "filter-try filter-try--passed" },
+            el("span", { class: "filter-try__verdict" }, caught ? `Il filtro blocca: c'è «${caught}»` : "Il filtro lascia passare"),
+            el("span", { class: "filter-try__message" }, message)
+          );
+        })
+      ),
+      el("p", { class: "activity__reply" }, filterCatch(activity, tries[tries.length - 1]) ? activity.blocked : activity.passed)
+    );
+  }
+  if (tries.length >= FILTER_TRIES) return box;
+  const input = el("input", {
+    class: "fill__input",
+    type: "text",
+    autocomplete: "off",
+    autocapitalize: "off",
+    spellcheck: "false",
+    maxlength: String(MESSAGE_LENGTH),
+    "aria-label": activity.question,
+    "data-focus": tries.length > 0,
+  });
   const hint = el("p", { class: "fill__hint", "aria-live": "polite" });
-  const confirm = el("button", { class: "button", type: "button" }, "Conferma");
-  confirm.addEventListener("click", () => {
-    const chosen = buttons.filter((item) => item.button.getAttribute("aria-pressed") === "true").map((item) => item.number);
-    if (!chosen.length) {
-      hint.textContent = "Tocca almeno una parola.";
+  const form = el("form", { class: "fill" }, input, el("button", { class: "button", type: "submit" }, tries.length ? "Prova ancora" : "Prova"));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const message = input.value.trim().replace(/\s+/g, " ");
+    if (!message) {
+      hint.textContent = "Scrivi un messaggio.";
+      input.focus();
       return;
     }
-    answer(view, entry, index, { picked: chosen });
+    answer(view, entry, index, { tries: [...tries, message] });
   });
-  box.append(el("p", { class: "actions word-pick__confirm" }, confirm), hint);
+  box.append(form, hint);
+  return box;
+}
+
+// Requests to approve, one at a time. "Sì" keeps the focus, as the default button of a
+// real approval window would: pressing Enter over and over is exactly the trap.
+function drawApproval(view, entry, index, activity, result, box) {
+  const said = result ? result.said : [];
+  const total = activity.requests.length;
+  box.append(el("p", { class: "activity__question" }, activity.question));
+  if (said.length < total) {
+    const request = activity.requests[said.length];
+    const yes = el("button", { class: "button", type: "button", "data-focus": true }, "Sì, approvo");
+    const no = el("button", { class: "button button--secondary", type: "button" }, "No, blocco");
+    yes.addEventListener("click", () => answer(view, entry, index, { said: [...said, true] }));
+    no.addEventListener("click", () => answer(view, entry, index, { said: [...said, false] }));
+    box.append(
+      el(
+        "div",
+        { class: "request" },
+        el("p", { class: "request__count" }, `Richiesta ${said.length + 1} di ${total}`),
+        request.title && el("p", { class: "request__title" }, request.title),
+        el("p", { class: "request__text" }, request.text),
+        el("p", { class: "actions request__actions" }, yes, no)
+      )
+    );
+    return box;
+  }
+  const approved = said.filter(Boolean).length;
+  const missed = activity.requests.some((request, number) => request.risky && said[number]);
+  box.append(
+    el(
+      "ol",
+      { class: "request-list" },
+      activity.requests.map((request, number) =>
+        el(
+          "li",
+          { class: request.risky ? "request-list__item request-list__item--risky" : "request-list__item" },
+          el("span", { class: "request-list__said" }, said[number] ? "✓ approvata" : "✗ bloccata"),
+          request.risky && el("span", { class: "request-list__risky" }, "pericolosa"),
+          el("span", { class: "request-list__text" }, request.title ? `${request.title} · ${request.text}` : request.text)
+        )
+      )
+    ),
+    el(
+      "p",
+      { class: "activity__reply" },
+      el("strong", {}, `Hai approvato ${approved} ${approved === 1 ? "richiesta" : "richieste"} su ${total}. `),
+      missed ? activity.missed : activity.stopped
+    )
+  );
   return box;
 }
 
@@ -757,7 +1437,10 @@ function drawDie(view, entry, index, activity, result, box) {
 function drawActivity(view, entry, index, activity, result) {
   const box = el("div", { class: "activity" });
   if (activity.kind === "parole") return drawWordPick(view, entry, index, activity, result, box);
+  if (activity.kind === "righe") return drawLinePick(view, entry, index, activity, result, box);
   if (activity.kind === "dado") return drawDie(view, entry, index, activity, result, box);
+  if (activity.kind === "filtro") return drawFilter(view, entry, index, activity, result, box);
+  if (activity.kind === "approva") return drawApproval(view, entry, index, activity, result, box);
   if (activity.kind === "scelta") {
     box.append(el("p", { class: "activity__question" }, activity.question));
     const choices = el("div", { class: "choices", role: "group", "aria-label": activity.question });
@@ -824,9 +1507,13 @@ function drawActivity(view, entry, index, activity, result) {
   return box;
 }
 
+// 'opened' says that this answer finished the activity: only then does what it reveals
+// fade in. A die throw, a filter try or an approval before the last one does not.
 function answer(view, entry, index, result) {
+  const activity = view.slides[view.progress.slide].steps[index].activity;
+  const before = resultComplete(activity, entry.results[index]);
   entry.results[index] = result;
-  view.fresh = { slide: view.progress.slide, step: index, part: "answer" };
+  view.fresh = { slide: view.progress.slide, step: index, part: "answer", opened: !before && resultComplete(activity, result) };
   draw(view, "answer");
 }
 
@@ -834,6 +1521,7 @@ function drawStep(view, slide, entry, index) {
   const step = slide.steps[index];
   const result = entry.results[index] || null;
   const fresh = view.fresh && view.fresh.slide === view.progress.slide && view.fresh.step === index ? view.fresh.part : null;
+  const opened = fresh === "answer" && view.fresh.opened;
   const node = el("div", { class: fresh === "step" ? "step is-new" : "step" });
   const fill = blankFill(step, result);
   const done = stepDone(slide, entry, index);
@@ -841,15 +1529,19 @@ function drawStep(view, slide, entry, index) {
   if (step.activity) {
     const activity = drawActivity(view, entry, index, step.activity, result);
     if (fresh === "answer") {
-      const appeared = [...node.querySelectorAll(".word-map__word--new"), ...activity.querySelectorAll(".activity__reply, .dice__roll:last-child")];
+      const revealed = ".word-map__word--new, .space__word--new, .space__dot--new, .dialog__line--new, .document__line--found";
+      const appeared = [
+        ...(opened ? node.querySelectorAll(revealed) : []),
+        ...activity.querySelectorAll(".activity__reply, .dice__roll:last-child, .filter-try:last-child, .request"),
+      ];
       for (const part of appeared) part.classList.add("is-new");
     }
     node.append(activity);
   }
   if (step.activity && resultComplete(step.activity, result)) {
     for (const block of step.after) {
-      const shown = drawBlock(view, block, true, fill, Boolean(fresh));
-      if (fresh === "answer") shown.classList.add("is-new");
+      const shown = drawBlock(view, block, true, fill, fresh === "step" || opened);
+      if (opened) shown.classList.add("is-new");
       node.append(shown);
     }
   }
@@ -900,7 +1592,14 @@ function drawNavigation(view) {
     "div",
     { class: "slide-nav" },
     el("p", { class: "actions slide-nav__buttons" }, back, next),
-    !complete && el("p", { class: "slide-nav__hint" }, "Completa la slide per andare avanti.")
+    !complete &&
+      el(
+        "p",
+        { class: "slide-nav__hint" },
+        slides[index].forSuperiori
+          ? "Completa la slide per andare avanti, oppure saltala con il pulsante in alto."
+          : "Completa la slide per andare avanti."
+      )
   );
 }
 
@@ -950,10 +1649,21 @@ function draw(view, focus) {
   const index = progress.slide;
   const slide = slides[index];
   const entry = progress.slides[index];
+  // A slide for the superiori can be skipped from the top, right beside its tag.
+  let skip = null;
+  if (slide.forSuperiori && !slideComplete(slide, entry)) {
+    skip = el("button", { class: "slide__skip", type: "button" }, "Salta questa slide →");
+    skip.addEventListener("click", () => {
+      entry.skipped = true;
+      progress.slide += 1;
+      view.fresh = null;
+      draw(view, "slide");
+    });
+  }
   const card = el(
     "section",
     { class: "slide", "aria-labelledby": "slide-title" },
-    slide.forSuperiori && el("p", { class: "slide__tag" }, "Per le superiori"),
+    slide.forSuperiori && el("div", { class: "slide__header" }, el("p", { class: "slide__tag" }, "Per le superiori"), skip),
     el("h2", { class: "slide__title", id: "slide-title", tabindex: "-1" }, slide.title)
   );
   const steps = el("div", { class: "slide__steps", "aria-live": "polite" });
@@ -969,18 +1679,6 @@ function draw(view, focus) {
       draw(view, "step");
     });
     card.append(el("p", { class: "actions slide__continue" }, next));
-  }
-  if (slide.forSuperiori && !slideComplete(slide, entry)) {
-    const skip = el("button", { class: "button button--secondary", type: "button" }, "Salta questa slide");
-    skip.addEventListener("click", () => {
-      entry.skipped = true;
-      progress.slide += 1;
-      view.fresh = null;
-      draw(view, "slide");
-    });
-    card.append(
-      el("div", { class: "slide__skip" }, el("p", {}, "Questa slide è un approfondimento per le superiori: puoi saltarla."), el("p", { class: "actions" }, skip))
-    );
   }
 
   main.append(drawProgress(index, slides.length), card, drawNavigation(view));

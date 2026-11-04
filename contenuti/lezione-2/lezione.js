@@ -8,6 +8,7 @@ registerLesson({
     { etichetta: "Slide della lezione", file: "slide.pdf", tipo: "pdf" },
     { etichetta: "Laboratorio", file: "laboratorio.ipynb", tipo: "notebook" },
   ],
+  interattiva: "interattiva.js",
   quiz: {
     titolo: "Quiz della lezione 2",
     domande: [
